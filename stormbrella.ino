@@ -4,31 +4,46 @@
 
 #include <Adafruit_NeoPixel.h>
 
-// Hardware.
+const unsigned int LIGHTNING_BULBS = 4,
+                   RAIN_COLS = 4,
+                   RAIN_ROWS = 35,
+                   RAIN_PINS[] = {
+                     2,
+                     3,
+                     4,
+                     5
+                   },
+                   DELAY = 30,
+                   LIGHTNING_CHANCE = 2, // Out of 10000.
+                   LIGHTNING_CHANCE_BOOST = 400, // Increase while active.
+                   MAX_BRIGHT = 50;
+
 unsigned int RELAYS[][2] = {
                {6, 0},
                {7, 0},
                {8, 0},
                {9, 0},
              },
-             array_size = 4;
-
-// Rain.
-const int RAIN_PIN = 3,
-          NUM_LIGHTS = 35;
-
-unsigned int COLOR_CYCLE = 0;
-
-Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(NUM_LIGHTS, RAIN_PIN, NEO_GRB + NEO_KHZ800);
-
-// Animation.
-const unsigned int DELAY = 50,
-                   LIGHTNING_CHANCE = 10, // Out of 10000.
-                   LIGHTNING_CHANCE_BOOST = 250; // Increase while active.
+             COLOR_CYCLE = 0,
+             rain_matrix[RAIN_COLS][RAIN_ROWS] = {0},
+             chance_of_rain = 2,
+             chance_of_rain_min = 2;
 
 boolean LIGHTNING_ACTIVE = 0,
         LIGHTNING_CALM = 1,
-        DEBUG = true;
+        DEBUG = false;
+
+uint32_t bg_color = Color(0, 0, 0),
+         rain_color = Color(50, 100, 240),
+         lightning_color = Color(255, 240, 50);
+
+Adafruit_NeoPixel strands[] = {
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[0], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[1], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[2], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[3], NEO_GRB + NEO_KHZ800)
+};
+
 
 /**
  * Startup.
@@ -37,12 +52,13 @@ void setup () {
   randomSeed(analogRead(0));
 
   // Rain.
-  strip1.begin();
-  strip1.show();
-  pinMode(RAIN_PIN, OUTPUT);
+  for (int i = 0; i < RAIN_COLS; i++) {
+    pinMode(RAIN_PINS[i], OUTPUT);
+    strands[i].begin();
+  }
 
   // Initialize lightning pins for output.
-  for (int i = 0; i < array_size; i++) {
+  for (int i = 0; i < LIGHTNING_BULBS; i++) {
     pinMode(RELAYS[i][0], OUTPUT);
     digitalWrite(RELAYS[i][0], LOW);    
   }
@@ -57,10 +73,36 @@ void setup () {
  */
 void loop () {
   lightning();
-  rainbowCycle();
+  rain();
+  //rainbowCycle();
   delay(DELAY);
 }
 
+
+/**
+ * Drops falling.
+ */
+void rain() {
+  int r, c;
+
+  make_drops();
+
+  // Display drops.
+  for (c = 0; c < RAIN_COLS; c++) {
+    for (r = 0; r < RAIN_ROWS; r++) {
+      if (rain_matrix[c][r] > 0) {
+        draw_drop(c, r, true);
+        move_drop(c, r);
+      }
+      else {
+        draw_drop(c, r, false);
+      }
+    } 
+  }
+  for (int i = 0; i < RAIN_COLS; i++) {
+    strands[i].show();
+  }
+}
 
 /**
  * Rainbow test pattern.
@@ -72,12 +114,86 @@ void rainbowCycle () {
     COLOR_CYCLE = 0;
   }
 
-  for (i = 0; i < strip1.numPixels(); i++) {
-    strip1.setPixelColor(i, Wheel(((i * 256 / strip1.numPixels()) + COLOR_CYCLE) & 255));
+  for (i = 0; i < strands[0].numPixels(); i++) {
+    strands[0].setPixelColor(i, Wheel(((i * 256 / strands[0].numPixels()) + COLOR_CYCLE) & 255));
   }
-  strip1.show();
-  
-  COLOR_CYCLE++;
+  strands[0].show();
+}
+
+
+/**
+ * Generate new rain drops.
+ **/
+void make_drops () {
+  // Change the weather?
+  switch (random(0, 3)) {
+    case 1:
+      chance_of_rain += 1;
+      break;
+      
+    case 2:
+      chance_of_rain -= 1;
+      break;
+      
+    case 3:
+    default:
+      break;
+  }
+
+  // Protect boundaries.
+  if (chance_of_rain <= 1) {
+   chance_of_rain = 2;
+  }
+  else if (chance_of_rain > chance_of_rain_min) {
+    chance_of_rain = chance_of_rain_min;
+  }
+
+  // Add a new drop?
+  if (random(0, chance_of_rain) == 1) {
+    // Pick a column
+    int c = random(0, RAIN_COLS);
+    int r = random(0, RAIN_ROWS);
+    
+     rain_matrix[c][r] = 1;
+
+     if (DEBUG) {
+       Serial.print(c);
+       Serial.println(" - 0");
+     }
+  }
+
+}
+
+/**
+ * Shift known drops to new position.
+ */
+void move_drop (int c, int r) {  
+  int save = rain_matrix[c][r];
+  // Out with the old.
+  rain_matrix[c][r] = 0;
+  // Can't move it on the ground.
+  if (r > 0) {
+    rain_matrix[c][r - 1] = save;
+
+    if (DEBUG) {
+      Serial.print(c);
+      Serial.print(" - ");
+      Serial.println(r);
+    }
+  }
+}
+
+
+/**
+ * Translate drop positions into data output.
+ */
+void draw_drop (int c, int r, boolean rain) {
+  if (rain) {
+    strands[c].setPixelColor(r, rain_color);
+  }
+  else {
+    strands[c].setPixelColor(r, bg_color);
+  }
 }
 
 
@@ -89,7 +205,7 @@ void lightning () {
   boolean anyOn = false;
 
   // All bulbs.
-  for (int i = 0; i < array_size; i++) {
+  for (int i = 0; i < LIGHTNING_BULBS; i++) {
     // Turn off first.
     digitalWrite(RELAYS[i][0], LOW);
 
@@ -104,11 +220,18 @@ void lightning () {
     // Determine if flashing.
     if (random(0, 1000) < chance) {
       // Pick a bulb.
-      int bulb = random(0, array_size);
+      int bulb = random(0, LIGHTNING_BULBS);
       // Switch it on and keep track.
       digitalWrite(RELAYS[bulb][0], HIGH);
       LIGHTNING_ACTIVE = 1;
       anyOn = true;
+
+      // Pick a column.
+      int c = random(0, RAIN_COLS);
+      for (int r = 0; r < strands[0].numPixels(); r++) {
+        strands[c].setPixelColor(r, lightning_color);
+      }
+      strands[c].show();
 
       if (DEBUG) {
         Serial.print(bulb);
@@ -123,19 +246,38 @@ void lightning () {
   }  
 }
 
+
 /**
  * Get color from 0 to 255 input.
  */
 uint32_t Wheel(byte WheelPos) {
   if (WheelPos < 85) {
-   return strip1.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+   return strands[0].Color(WheelPos * 3, 255 - WheelPos * 3, 0);
   }
   else if (WheelPos < 170) {
    WheelPos -= 85;
-   return strip1.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+   return strands[0].Color(255 - WheelPos * 3, 0, WheelPos * 3);
   }
   else {
    WheelPos -= 170;
-   return strip1.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+   return strands[0].Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
 }
+
+/**
+ * Create a 24 bit color value from R, G, B.
+ */
+uint32_t Color(byte r, byte g, byte b) {
+  r = map(r, 0, 255, 0, MAX_BRIGHT);
+  g = map(g, 0, 255, 0, MAX_BRIGHT);
+  b = map(b, 0, 255, 0, MAX_BRIGHT);
+  
+  uint32_t c;
+  c = r;
+  c <<= 8;
+  c |= g;
+  c <<= 8;
+  c |= b;
+  return c;
+}
+
