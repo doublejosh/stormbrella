@@ -31,6 +31,7 @@ unsigned int RELAYS[][2] = {
 
 boolean LIGHTNING_ACTIVE = 0,
         LIGHTNING_CALM = 1,
+        INVERT_RAIN = true,
         DEBUG = false;
 
 uint32_t bg_color = Color(0, 0, 0),
@@ -188,6 +189,10 @@ void move_drop (int c, int r) {
  * Translate drop positions into data output.
  */
 void draw_drop (int c, int r, boolean rain) {
+  if (INVERT_RAIN) {
+    r = RAIN_ROWS - r;
+  }
+  
   if (rain) {
     strands[c].setPixelColor(r, rain_color);
   }
