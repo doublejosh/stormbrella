@@ -5,44 +5,50 @@
 #include <Adafruit_NeoPixel.h>
 
 const unsigned int LIGHTNING_BULBS = 4,
-                   RAIN_COLS = 4,
-                   RAIN_ROWS = 35,
-                   RAIN_PINS[] = {
-                     2,
-                     3,
-                     4,
-                     5
-                   },
-                   DELAY = 30,
-                   LIGHTNING_CHANCE = 2, // Out of 10000.
-                   LIGHTNING_CHANCE_BOOST = 400, // Increase while active.
-                   MAX_BRIGHT = 50;
+                   RAIN_COLS = 8,
+                   RAIN_ROWS = 36,
+                   RAIN_PINS[] = {2, 3, 4, 5, 6, 7, 8, 9},
+                   DELAY = 16,
+                   LIGHTNING_CHANCE = 16, // Out of 10000.
+                   LIGHTNING_CHANCE_BOOST = 4000, // Increase while active.
+                   MAX_BRIGHT = 30,
+                   RAINBOW_RAIN = false;
 
-unsigned int RELAYS[][2] = {
-               {6, 0},
-               {7, 0},
-               {8, 0},
-               {9, 0},
-             },
-             COLOR_CYCLE = 0,
-             rain_matrix[RAIN_COLS][RAIN_ROWS] = {0},
-             chance_of_rain = 2,
-             chance_of_rain_min = 2;
+unsigned int COLOR_CYCLE = 0,
+             chance_of_rain = 2, // Less is more.
+             chance_of_rain_min = 2,
+             rainbow_cycle = 1;
+
+uint8_t RELAYS[][2] = {{10, 0}, {11, 0}, {12, 0}, {13, 0}},
+        rain_matrix[RAIN_COLS][RAIN_ROWS] = {0};
 
 boolean LIGHTNING_ACTIVE = 0,
         LIGHTNING_CALM = 1,
         INVERT_RAIN = true,
+        RAINBOW_MODE = false,
         DEBUG = false;
 
 uint32_t bg_color = Color(0, 0, 0),
          rain_color = Color(50, 100, 240),
          lightning_color = Color(255, 240, 50);
+//         rainbow_cycle_colors[] = {
+//           Color(255, 0 , 0),
+//           Color(255, 127, 0),
+//           Color(255, 255, 0),
+//           Color(0, 255, 0),
+//           Color(0, 0, 255),
+//           Color(75, 0, 130)
+//         };
 
 Adafruit_NeoPixel strands[] = {
   Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[0], NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[1], NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[2], NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[3], NEO_GRB + NEO_KHZ800)
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[3], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[4], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[5], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[6], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[7], NEO_GRB + NEO_KHZ800)
 };
 
 
@@ -86,22 +92,21 @@ void loop () {
 void rain() {
   int r, c;
 
+  if (DEBUG) {
+    Serial.println("RAINING");
+  }
+
   make_drops();
 
   // Display drops.
   for (c = 0; c < RAIN_COLS; c++) {
-    for (r = 0; r < RAIN_ROWS; r++) {
+    for (r = 0; r < RAIN_ROWS; r++) {     
+      draw_pixel(c, r);
       if (rain_matrix[c][r] > 0) {
-        draw_drop(c, r, true);
         move_drop(c, r);
       }
-      else {
-        draw_drop(c, r, false);
-      }
-    } 
-  }
-  for (int i = 0; i < RAIN_COLS; i++) {
-    strands[i].show();
+    }
+    strands[c].show();
   }
 }
 
@@ -109,16 +114,18 @@ void rain() {
  * Rainbow test pattern.
  */
 void rainbowCycle () {
-  uint16_t i, j;
+  uint16_t i, s;
 
   if (COLOR_CYCLE > 256) {
     COLOR_CYCLE = 0;
   }
 
-  for (i = 0; i < strands[0].numPixels(); i++) {
-    strands[0].setPixelColor(i, Wheel(((i * 256 / strands[0].numPixels()) + COLOR_CYCLE) & 255));
+  for (s = 0; s < RAIN_COLS; s++) {
+    for (i = 0; i < strands[0].numPixels(); i++) {
+      strands[s].setPixelColor(i, Wheel(((i * 256 / strands[s].numPixels()) + COLOR_CYCLE) & 255));
+    }
+    strands[s].show();
   }
-  strands[0].show();
 }
 
 
@@ -126,41 +133,63 @@ void rainbowCycle () {
  * Generate new rain drops.
  **/
 void make_drops () {
-  // Change the weather?
-  switch (random(0, 3)) {
-    case 1:
-      chance_of_rain += 1;
-      break;
-      
-    case 2:
-      chance_of_rain -= 1;
-      break;
-      
-    case 3:
-    default:
-      break;
+  int column,
+      row;
+
+  if (DEBUG) {
+    Serial.println("Making");
   }
 
+  // Change the weather?
+//  switch (random(0, 3)) {
+//    case 1:
+//      chance_of_rain += 1;
+//      break;
+//      
+//    case 2:
+//      chance_of_rain -= 1;
+//      break;
+//      
+//    case 3:
+//    default:
+//      break;
+//  }
+
   // Protect boundaries.
-  if (chance_of_rain <= 1) {
-   chance_of_rain = 2;
-  }
-  else if (chance_of_rain > chance_of_rain_min) {
-    chance_of_rain = chance_of_rain_min;
+//  if (chance_of_rain < chance_of_rain_min) {
+//    chance_of_rain = chance_of_rain_min;
+//  }
+
+  if (DEBUG) {
+    Serial.print("CHANCE OF RAIN: ");
+    Serial.println(chance_of_rain);
   }
 
   // Add a new drop?
   if (random(0, chance_of_rain) == 1) {
-    // Pick a column
-    int c = random(0, RAIN_COLS);
-    int r = random(0, RAIN_ROWS);
-    
-     rain_matrix[c][r] = 1;
+    // Pick a spot.
+    column = random(0, RAIN_COLS),
+    row = random(0, RAIN_ROWS);
+    rain_matrix[column][row] = 1; //rainbow_cycle;
 
-     if (DEBUG) {
-       Serial.print(c);
-       Serial.println(" - 0");
-     }
+    if (DEBUG) {
+      Serial.print("New Drop: ");
+      Serial.print(column);
+      Serial.print(" - ");
+      Serial.println(row);
+    }
+
+    // Next color.
+//    rainbow_cycle++;
+//    if (rainbow_cycle > 6) {
+//      rainbow_cycle = 1;
+//    }
+  
+    if (DEBUG) {
+//      Serial.print(column);
+//      Serial.print(" - ");
+//      Serial.println(rainbow_cycle);
+    }
   }
 
 }
@@ -177,9 +206,9 @@ void move_drop (int c, int r) {
     rain_matrix[c][r - 1] = save;
 
     if (DEBUG) {
-      Serial.print(c);
-      Serial.print(" - ");
-      Serial.println(r);
+//      Serial.print(c);
+//      Serial.print(" - ");
+//      Serial.println(r);
     }
   }
 }
@@ -188,17 +217,26 @@ void move_drop (int c, int r) {
 /**
  * Translate drop positions into data output.
  */
-void draw_drop (int c, int r, boolean rain) {
-  if (INVERT_RAIN) {
-    r = RAIN_ROWS - r;
+void draw_pixel (int c, int r) {
+  uint32_t drop_color = bg_color;
+
+  if (DEBUG && rain_matrix[c][r] == 1) {
+    Serial.print(c);
+    Serial.print(" - ");
+    Serial.print(r);
+    Serial.print(" - ");
+    Serial.println(rain_matrix[c][r]);
+  }
+
+  if (rain_matrix[c][r] > 0) {
+    //drop_color = (RAINBOW_MODE) ? rainbow_cycle_colors[rain - 1]: rain_color;
+    drop_color = rain_color;
   }
   
-  if (rain) {
-    strands[c].setPixelColor(r, rain_color);
+  if (INVERT_RAIN) {
+    r = RAIN_ROWS - (r + 1);
   }
-  else {
-    strands[c].setPixelColor(r, bg_color);
-  }
+  strands[c].setPixelColor(r, drop_color);
 }
 
 
@@ -223,7 +261,7 @@ void lightning () {
     }
 
     // Determine if flashing.
-    if (random(0, 1000) < chance) {
+    if (random(0, 10000) < chance) {
       // Pick a bulb.
       int bulb = random(0, LIGHTNING_BULBS);
       // Switch it on and keep track.
@@ -232,15 +270,17 @@ void lightning () {
       anyOn = true;
 
       // Pick a column.
-      int c = random(0, RAIN_COLS);
-      for (int r = 0; r < strands[0].numPixels(); r++) {
+      int c = random(0, RAIN_COLS),
+          length = random(3, strands[0].numPixels());
+      for (int r = 0; r < length; r++) {
         strands[c].setPixelColor(r, lightning_color);
       }
       strands[c].show();
 
       if (DEBUG) {
+        Serial.println("-----");
         Serial.print(bulb);
-        Serial.print(" - ");
+        Serial.println(" -- ");
         Serial.println(chance);
       }
     }
