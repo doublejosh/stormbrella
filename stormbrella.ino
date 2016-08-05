@@ -25,20 +25,20 @@ uint8_t RELAYS[][2] = {{10, 0}, {11, 0}, {12, 0}, {13, 0}},
 boolean LIGHTNING_ACTIVE = 0,
         LIGHTNING_CALM = 1,
         INVERT_RAIN = true,
-        RAINBOW_MODE = false,
+        RAINBOW_MODE = true,
         DEBUG = false;
 
 uint32_t bg_color = Color(0, 0, 0),
          rain_color = Color(50, 100, 240),
-         lightning_color = Color(255, 240, 50);
-//         rainbow_cycle_colors[] = {
-//           Color(255, 0 , 0),
-//           Color(255, 127, 0),
-//           Color(255, 255, 0),
-//           Color(0, 255, 0),
-//           Color(0, 0, 255),
-//           Color(75, 0, 130)
-//         };
+         lightning_color = Color(255, 240, 50),
+         rainbow_cycle_colors[] = {
+           Color(255, 0 , 0),
+           Color(255, 127, 0),
+           Color(255, 255, 0),
+           Color(0, 255, 0),
+           Color(0, 0, 255),
+           Color(75, 0, 130)
+         };
 
 Adafruit_NeoPixel strands[] = {
   Adafruit_NeoPixel(RAIN_ROWS, RAIN_PINS[0], NEO_GRB + NEO_KHZ800),
@@ -170,7 +170,7 @@ void make_drops () {
     // Pick a spot.
     column = random(0, RAIN_COLS),
     row = random(0, RAIN_ROWS);
-    rain_matrix[column][row] = 1; //rainbow_cycle;
+    rain_matrix[column][row] = rainbow_cycle; //1;
 
     if (DEBUG) {
       Serial.print("New Drop: ");
@@ -180,16 +180,16 @@ void make_drops () {
     }
 
     // Next color.
-//    rainbow_cycle++;
-//    if (rainbow_cycle > 6) {
-//      rainbow_cycle = 1;
-//    }
+    rainbow_cycle++;
+    if (rainbow_cycle > 6) {
+      rainbow_cycle = 1;
+    }
   
-    if (DEBUG) {
+//    if (DEBUG) {
 //      Serial.print(column);
 //      Serial.print(" - ");
 //      Serial.println(rainbow_cycle);
-    }
+//    }
   }
 
 }
@@ -205,11 +205,11 @@ void move_drop (int c, int r) {
   if (r > 0) {
     rain_matrix[c][r - 1] = save;
 
-    if (DEBUG) {
+//    if (DEBUG) {
 //      Serial.print(c);
 //      Serial.print(" - ");
 //      Serial.println(r);
-    }
+//    }
   }
 }
 
@@ -229,8 +229,12 @@ void draw_pixel (int c, int r) {
   }
 
   if (rain_matrix[c][r] > 0) {
-    //drop_color = (RAINBOW_MODE) ? rainbow_cycle_colors[rain - 1]: rain_color;
-    drop_color = rain_color;
+    if (RAINBOW_MODE) {
+      drop_color = rainbow_cycle_colors[rain_matrix[c][r]];
+    }
+    else {
+      drop_color = rain_color;
+    }
   }
   
   if (INVERT_RAIN) {
