@@ -1,5 +1,8 @@
 /**
  * Stormbrella
+ * 
+ * A weather related light show inside your umbrella,
+ * half-written in tents under duress.
  */
 
 #include <Adafruit_NeoPixel.h>
@@ -8,25 +11,25 @@ const unsigned int LIGHTNING_BULBS = 4,
                    RAIN_COLS = 8,
                    RAIN_ROWS = 36,
                    RAIN_PINS[] = {2, 3, 4, 5, 6, 7, 8, 9},
-                   DELAY = 16,
-                   LIGHTNING_CHANCE = 16, // Out of 10000.
-                   LIGHTNING_CHANCE_BOOST = 4000, // Increase while active.
-                   MAX_BRIGHT = 30,
-                   RAINBOW_RAIN = false;
+                   DELAY = 40,
+                   LIGHTNING_CHANCE = 13, // Out of 10000.
+                   LIGHTNING_CHANCE_BOOST = 3800, // Increase while active.
+                   LIGHTNING_MIN_LEN = 18,
+                   MAX_BRIGHT = 30;
 
 unsigned int COLOR_CYCLE = 0,
              chance_of_rain = 2, // Less is more.
              chance_of_rain_min = 2,
-             rainbow_cycle = 1;
+             rainbow_cycle = 0,
+             spiral_position = 0;
 
 uint8_t RELAYS[][2] = {{10, 0}, {11, 0}, {12, 0}, {13, 0}},
         rain_matrix[RAIN_COLS][RAIN_ROWS] = {0};
 
 boolean LIGHTNING_ACTIVE = 0,
-        LIGHTNING_CALM = 1,
         INVERT_RAIN = true,
         RAINBOW_MODE = true,
-        DEBUG = false;
+        DEBUG = true;
 
 uint32_t bg_color = Color(0, 0, 0),
          rain_color = Color(50, 100, 240),
@@ -37,7 +40,8 @@ uint32_t bg_color = Color(0, 0, 0),
            Color(255, 255, 0),
            Color(0, 255, 0),
            Color(0, 0, 255),
-           Color(75, 0, 130)
+           Color(75, 0, 130),
+           Color(0, 0, 0)
          };
 
 Adafruit_NeoPixel strands[] = {
@@ -81,6 +85,7 @@ void setup () {
 void loop () {
   lightning();
   rain();
+  //spiral();
   //rainbowCycle();
   delay(DELAY);
 }
@@ -182,7 +187,7 @@ void make_drops () {
     // Next color.
     rainbow_cycle++;
     if (rainbow_cycle > 6) {
-      rainbow_cycle = 1;
+      rainbow_cycle = 0;
     }
   
 //    if (DEBUG) {
@@ -275,7 +280,7 @@ void lightning () {
 
       // Pick a column.
       int c = random(0, RAIN_COLS),
-          length = random(3, strands[0].numPixels());
+          length = random(LIGHTNING_MIN_LEN, strands[0].numPixels());
       for (int r = 0; r < length; r++) {
         strands[c].setPixelColor(r, lightning_color);
       }
@@ -293,6 +298,54 @@ void lightning () {
   if (!anyOn) {
     LIGHTNING_ACTIVE = 0;
   }  
+}
+
+
+/**
+ * Round and round.
+ */
+void spiral() {
+  int column = spiral_position % RAIN_COLS,
+      color = spiral_position % 7;
+      //row = (int) spiral_position / RAIN_COLS,
+      //prev_col = (spiral_position - 1) % RAIN_COLS,
+      //prev_row = ((int) spiral_position - 1) / RAIN_COLS;
+//      prev_col2 = (spiral_position - 2) % RAIN_COLS,
+//      prev_row2 = ((int) spiral_position - 2) / RAIN_COLS;
+
+//  for (int c = 0; c < RAIN_COLS; c++) {
+//    for (int r = 0; r < RAIN_ROWS; r++) {
+//      strands[c].setPixelColor(r, bg_color);
+//    }
+//    strands[c].show();
+//  }
+
+  for (int r = 0; r < RAIN_ROWS; r++) {
+    strands[column].setPixelColor(r, rainbow_cycle_colors[color]);
+  }
+
+  //strands[column].setPixelColor(row, rain_color);
+  //strands[prev_col].setPixelColor(prev_row, rain_color);
+  //strands[prev_col2].setPixelColor(prev_row2, bg_color);
+  strands[column].show();
+  //strands[prev_col].show();
+  //strands[prev_col2].show();
+//  
+  if (DEBUG) {
+    Serial.print(column);
+    Serial.print(" - ");
+    Serial.println(color);
+//    Serial.print(" ----- ");
+//    Serial.print(prev_col);
+//    Serial.print(" - ");
+//    Serial.println(prev_row);
+  }
+  
+  spiral_position++;
+  
+  if (column > RAIN_COLS) {
+    spiral_position = 0;
+  }
 }
 
 
