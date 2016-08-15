@@ -1,6 +1,13 @@
 /**
  * Stormbrella
- * 
+ *        .
+ *       _|_
+ *    .-'   '-.
+ *   /         \
+ *   ^^^^^|^^^^^
+ *        |
+ *        \_/
+ *
  * A weather related light show inside your umbrella,
  * half-written in tents under duress.
  */
@@ -11,7 +18,7 @@ const unsigned int LIGHTNING_BULBS = 4,
                    RAIN_COLS = 8,
                    RAIN_ROWS = 36,
                    RAIN_PINS[] = {2, 3, 4, 5, 6, 7, 8, 9},
-                   DELAY = 40,
+                   DELAY = 20,
                    LIGHTNING_CHANCE = 13, // Out of 10000.
                    LIGHTNING_CHANCE_BOOST = 3800, // Increase while active.
                    LIGHTNING_MIN_LEN = 18,
@@ -28,8 +35,8 @@ uint8_t RELAYS[][2] = {{10, 0}, {11, 0}, {12, 0}, {13, 0}},
 
 boolean LIGHTNING_ACTIVE = 0,
         INVERT_RAIN = true,
-        RAINBOW_MODE = true,
-        DEBUG = true;
+        RAINBOW_MODE = false,
+        DEBUG = false;
 
 uint32_t bg_color = Color(0, 0, 0),
          rain_color = Color(50, 100, 240),
